@@ -9,11 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@chakra-ui/react": "^2.8.0",
+    "@rainbow-me/rainbowkit": "^1.0.7",
     "@types/node": "20.4.3",
     "@types/react": "18.2.15",
     "@types/react-dom": "18.2.7",
     "eslint": "8.45.0",
     "eslint-config-next": "13.4.12",
+    "langchain": "^0.0.114",
     "next": "13.4.12",
     "react": "18.2.0",
     "react-dom": "18.2.0",
