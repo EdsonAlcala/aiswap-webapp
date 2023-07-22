@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import ABI from "../abis/AISwap.json";
 import ERC20ABI from '../abis/ERC20.json';
 import SuccessToast from "./SuccessToast";
+import { getChainId, getTokenAddress } from "@/utils";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -102,57 +103,21 @@ export default function IntentView() {
         },
     })
 
-    const getTokenAddress = (tokenName: string) => {
-        switch (tokenName.toLowerCase()) {
-            case "usdc":
-                return "0x131823ca7E06cacbDF4B04d14fF2fb4FB2EEF6B7";
-            case "weth":
-                return "0xBb50908414e123D835e9c0ef42d4BA957d621D45";
-            default:
-                throw new Error("Token not supported")
-        }
+    const calculateOutputAmount = () => {
+        const outputAmount = intentDecoded?.tokenInputAmount;
+        setOutPutAmount(outputAmount);
     }
 
-    const getChainId = (chainName: string) => {
-        // MAINNETS
-        if (chainName.toLowerCase() === "ethereum") {
-            return 1
-        }
+    // useEffect(() => {
+    //     setTimeout(() => {
+    //         setIsQuoting(false);
+    //         calculateOutputAmount();
+    //     }, 3000);
+    // }, [isQuoting])
 
-        if (chainName.toLowerCase() === "gnosis" || chainName.toLowerCase() === "gnosis chain") {
-            return 100
-        }
+    async function quote() {
+        setIsQuoting(true);
 
-        if (chainName.toLowerCase() === "arbitrum" || chainName.toLowerCase() === "arbitrum one") {
-            return 42161
-        }
-
-        if (chainName.toLowerCase() === "op" || chainName.toLowerCase() === "optimism") {
-            return 10
-        }
-
-        // TESTNETS
-        if (chainName.toLowerCase() === "gnosis chiado testnet" || chainName.toLowerCase() === "gnosis testnet") {
-            return 10200
-        }
-
-        if (chainName.toLowerCase() === "goerli") {
-            return 5
-        }
-
-        if (chainName.toLowerCase() === "arbitrum goerli" || chainName.toLowerCase() === "arbitrum testnet") {
-            return 421613
-        }
-
-        if (chainName.toLowerCase() === "linea testnet") {
-            return 59140
-        }
-    }
-
-    // Handle processing of input value
-    const intervalRef = useRef<number | undefined>();
-
-    const processInputValue = async () => {
         const messages = await prompt.format({
             text: userIntent // Example: I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain
         });
@@ -165,88 +130,55 @@ export default function IntentView() {
 
             if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
                 setIntentDecoded(decoded);
-
-                try {
-                    getTokenAddress(decoded.tokenInput)
-                } catch (error) {
-                    setAssetNotSupported(decoded.tokenInput);
-                    setAnAssetIsNotSupported(true);
-                    return;
-                }
-
-                try {
-                    getTokenAddress(decoded.tokenOutput);
-                } catch (error) {
-                    setAssetNotSupported(decoded.tokenOutput);
-                    setAnAssetIsNotSupported(true);
-                    return;
-                }
-
-                // we are sure only supported assets will reach this point
-                const currentAllowance: any = await publicClient.readContract({
-                    address: getTokenAddress(decoded.tokenInput),
-                    abi: ERC20ABI,
-                    functionName: 'allowance',
-                    args: [
-                        address,
-                        process.env.NEXT_PUBLIC_AISWAP_ADDRESS
-                    ]
-                })
-
-                console.log("Current allowance: ", currentAllowance)
-
-                const requiredAllowance = ethers.parseEther(decoded.tokenInputAmount.toString());
-
-                console.log("Required allowance: ", requiredAllowance)
-
-                if (currentAllowance < requiredAllowance) {
-                    console.log("It requires allowance")
-                    setRequiresAllowance(true);
-                }
-
-                setIsQuoting(true);
             }
+
+            try {
+                getTokenAddress(decoded.tokenInput)
+            } catch (error) {
+                setAssetNotSupported(decoded.tokenInput);
+                setAnAssetIsNotSupported(true);
+                return;
+            }
+
+            try {
+                getTokenAddress(decoded.tokenOutput);
+            } catch (error) {
+                setAssetNotSupported(decoded.tokenOutput);
+                setAnAssetIsNotSupported(true);
+                return;
+            }
+
+            // we are sure only supported assets will reach this point
+            const currentAllowance: any = await publicClient.readContract({
+                address: getTokenAddress(decoded.tokenInput),
+                abi: ERC20ABI,
+                functionName: 'allowance',
+                args: [
+                    address,
+                    process.env.NEXT_PUBLIC_AISWAP_ADDRESS
+                ]
+            })
+
+            console.log("Current allowance: ", currentAllowance)
+
+            const requiredAllowance = ethers.parseEther(decoded.tokenInputAmount.toString());
+
+            console.log("Required allowance: ", requiredAllowance)
+
+            if (currentAllowance < requiredAllowance) {
+                console.log("It requires allowance")
+                setRequiresAllowance(true);
+            }
+
+            setTimeout(() => {
+                setIsQuoting(false);
+                calculateOutputAmount();
+            }, 3000);
+
         } catch (error) {
             console.log("Invalid response, so we don't change state");
         }
-    };
-
-    const calculateOutputAmount = () => {
-        const outputAmount = intentDecoded?.tokenInputAmount;
-        setOutPutAmount(outputAmount);
     }
-
-    useEffect(() => {
-        setTimeout(() => {
-            setIsQuoting(false);
-            calculateOutputAmount();
-        }, 3000);
-    }, [isQuoting])
-
-    useEffect(() => {
-        if (userIntent !== '') {
-
-            setIntentDecoded(undefined);
-
-            const intervalFunction = () => {
-                processInputValue()
-            };
-
-            intervalRef.current = window.setInterval(intervalFunction, 5000);
-
-            return () => {
-                clearInterval(intervalRef.current);
-            };
-        } else {
-            clearInterval(intervalRef.current);
-        }
-    }, [userIntent]);
-
-    useEffect(() => {
-        if (intentDecoded) {
-            clearInterval(intervalRef.current);
-        }
-    }, [intentDecoded]);
 
     async function swap() {
         if (intentDecoded && outPutAmount) {
@@ -287,6 +219,12 @@ export default function IntentView() {
         setOutPutAmount(undefined);
     }
 
+    const handleKeyUp = (e: any) => {
+        if (e.key === 'Enter') {
+            quote();
+        }
+    }
+
     return (
         <Flex justifyContent="center" flex={1} alignContent="center" alignItems="center">
             <Box
@@ -314,6 +252,7 @@ export default function IntentView() {
 
                     <Box>
                         <Input
+                            onKeyUp={handleKeyUp}
                             placeholder="i.e Swap 10 DAI for 10 USDC in Arbitrum"
                             fontWeight="400"
                             disabled={!address || anAssetIsNotSupported}
@@ -375,7 +314,7 @@ export default function IntentView() {
                                 Write your intent
                             </Button>)}
 
-                        {userIntent !== '' && !anAssetIsNotSupported && (
+                        {userIntent !== '' && !anAssetIsNotSupported && intentDecoded && (
                             <Button
                                 onClick={() => requiresAllowance ? approveTokenAllowance() : swap()}
                                 color="rgb(213, 0, 102)"
@@ -401,7 +340,12 @@ export default function IntentView() {
                                         </div>
                                     </Flex>
                                 )}
-                                {(!isLoading && !isApproving) ? intentDecoded ? (requiresAllowance ? "Approve" : "Swap") : "Processing..." : ""}
+                                {isQuoting && (
+                                    <Flex flexDirection={"row"} alignItems={"center"}>
+                                        Quoting...
+                                    </Flex>
+                                )}
+                                {(!isLoading && !isApproving && !isQuoting) ? requiresAllowance ? "Approve" : "Swap" : ""}
                             </Button>)}
 
                         {anAssetIsNotSupported && (
