@@ -22,15 +22,12 @@ tokenOutput: The token the user wants to receive \
 
 tokenInputAmount: The amount of token the user wants to swap \
 
-tokenOutputAmount: The amount of token the user wants to receive \
-
 Format the output as JSON with the following keys:
 from
 to
 tokenInput
 tokenOutput
 tokenInputAmount
-tokenOutputAmount
 
 text: {text}
 
@@ -46,7 +43,6 @@ interface IntentDecoded {
     tokenInput: string;
     tokenOutput: string;
     tokenInputAmount: number;
-    tokenOutputAmount: number;
 }
 
 export default function IntentView() {
@@ -57,6 +53,8 @@ export default function IntentView() {
 
     const publicClient = usePublicClient()
     const [requiresAllowance, setRequiresAllowance] = useState(false)
+    const [isQuoting, setIsQuoting] = useState(false)
+    const [outPutAmount, setOutPutAmount] = useState<number | undefined>(undefined)
 
     // To handle assets not supported
     const [anAssetIsNotSupported, setAnAssetIsNotSupported] = useState(false)
@@ -71,6 +69,7 @@ export default function IntentView() {
             console.log("Swap successful", data)
             setIntentDecoded(undefined);
             setUserIntent('');
+            setOutPutAmount(undefined);
             toast.success(
                 <SuccessToast
                     chainId={chain?.id as any}
@@ -164,7 +163,7 @@ export default function IntentView() {
             const decoded = JSON.parse(response) as IntentDecoded;
             console.log(decoded);
 
-            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount && decoded.tokenOutputAmount) {
+            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
                 setIntentDecoded(decoded);
 
                 try {
@@ -204,11 +203,25 @@ export default function IntentView() {
                     console.log("It requires allowance")
                     setRequiresAllowance(true);
                 }
+
+                setIsQuoting(true);
             }
         } catch (error) {
             console.log("Invalid response, so we don't change state");
         }
     };
+
+    const calculateOutputAmount = () => {
+        const outputAmount = intentDecoded?.tokenInputAmount;
+        setOutPutAmount(outputAmount);
+    }
+
+    useEffect(() => {
+        setTimeout(() => {
+            setIsQuoting(false);
+            calculateOutputAmount();
+        }, 3000);
+    }, [isQuoting])
 
     useEffect(() => {
         if (userIntent !== '') {
@@ -236,14 +249,14 @@ export default function IntentView() {
     }, [intentDecoded]);
 
     async function swap() {
-        if (intentDecoded) {
+        if (intentDecoded && outPutAmount) {
             write({
                 args: [
                     {
                         tokenInputAddress: getTokenAddress(intentDecoded.tokenInput),
                         tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput),
                         tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
-                        minimumTokenOutputAmount: ethers.parseEther(intentDecoded.tokenOutputAmount.toString()),
+                        minimumTokenOutputAmount: ethers.parseEther(outPutAmount.toString()),
                         sourceChain: getChainId(intentDecoded.from),
                         destinationChain: getChainId(intentDecoded.to)
                     }
@@ -271,6 +284,7 @@ export default function IntentView() {
         setAssetNotSupported('');
         setUserIntent('');
         setIntentDecoded(undefined);
+        setOutPutAmount(undefined);
     }
 
     return (
@@ -282,16 +296,6 @@ export default function IntentView() {
                 marginTop={{ base: '10rem', md: '10rem' }}
                 boxShadow="0px 0px 20px rgba(0, 0, 0, 0.05)"
             >
-                <Button onClick={() => toast.success(
-                    <SuccessToast
-                        chainId={chain?.id as any}
-                        hash={"0x1234567890"}
-                    />,
-                    {
-                        autoClose: 10000,
-                        toastId: "0x1234567890"
-                    }
-                )}>Show Toast</Button>
                 <Flex
                     alignItems="left"
                     flexDirection="column"
@@ -312,7 +316,7 @@ export default function IntentView() {
                         <Input
                             placeholder="i.e Swap 10 DAI for 10 USDC in Arbitrum"
                             fontWeight="400"
-                            disabled={!address}
+                            disabled={!address || anAssetIsNotSupported}
                             fontSize="0.9rem"
                             width="100%"
                             height={{ base: '4em', md: '4em' }}
@@ -326,6 +330,21 @@ export default function IntentView() {
                             onChange={e => setUserIntent(e.target.value)}
                             value={userIntent}
                         />
+                    </Box>
+                    <Box>
+                        {isQuoting && (
+                            <Flex flexDirection={"row"} alignItems={"center"}>
+                                Fetching best price...
+                                <div style={{ padding: '1em' }}>
+                                    <Spinner color="red.500" />
+                                </div>
+                            </Flex>
+
+                        )}
+                        {!isQuoting && outPutAmount && (
+                            <Flex flexDirection={"row"} alignItems={"center"}>
+                                You will get {outPutAmount} {intentDecoded?.tokenOutput}
+                            </Flex>)}
                     </Box>
                     <Box>
                         {!address && (
