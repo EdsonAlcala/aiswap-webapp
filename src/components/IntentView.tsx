@@ -36,7 +36,7 @@ text: {text}
 `);
 
 const llm = new OpenAI({
-    openAIApiKey: "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"
+    openAIApiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY as string,
 });
 
 interface IntentDecoded {
@@ -128,6 +128,8 @@ export default function IntentView() {
             const decoded = JSON.parse(response) as IntentDecoded;
             console.log(decoded);
 
+            console.log(getChainId(chain?.network as any))
+
             if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
                 setIntentDecoded(decoded);
                 console.log("Setting intent decoded", decoded);
@@ -192,7 +194,7 @@ export default function IntentView() {
                         tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput),
                         tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
                         minimumTokenOutputAmount: ethers.parseEther(outPutAmount.toString()),
-                        sourceChain: getChainId(intentDecoded.from),
+                        sourceChain: chain?.id,
                         destinationChain: getChainId(intentDecoded.to)
                     }
                 ],
