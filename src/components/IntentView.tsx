@@ -1,7 +1,8 @@
 import { Box, Button, Flex, Input, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
+import { ethers } from "ethers";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -33,35 +34,108 @@ const llm = new OpenAI({
     openAIApiKey: "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"
 });
 
-
+interface IntentDecoded {
+    from: string;
+    to: string;
+    tokenInput: string;
+    tokenOutput: string;
+    tokenInputAmount: number;
+    tokenOutputAmount: number;
+}
 
 export default function IntentView() {
     const [userIntent, setUserIntent] = useState('')
     const [isSwapping, setIsSwapping] = useState(false)
+    const [intentDecoded, setIntentDecoded] = useState<IntentDecoded | undefined>(undefined);
 
     async function swap() {
         setIsSwapping(true)
         // TODO
     }
 
-    const test = async () => {
+    const getChainId = (chainName: string) => {
+        return 1
+    }
+
+    const buildTransaction = async () => {
+        if (intentDecoded) {
+            // from
+            // to
+            // tokenInput
+            // tokenOutput
+            // tokenInputAmount
+            // tokenOutputAmount
+            const txPayload = {
+
+            }
+            // create contract instance and simply use the intent information
+            // get provider from wagmi
+
+            // const contract = new ethers.Contract("0x5FbDB2315678afecb367f032d93F642f64180aa3", [], ethers.getDefaultProvider());
+
+            // const tx = await contract.createOrder({
+            //     tokenInputAddress: intentDecoded.tokenInput,
+            //     tokenOutputAddress: intentDecoded.tokenOutput,
+            //     tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
+            //     minimumTokenOutputAmount: ethers.parseEther(intentDecoded.tokenOutputAmount.toString()),
+            //     sourceChain: getChainId(intentDecoded.from),
+            //     destinationChain: getChainId(intentDecoded.to)
+            // });
+
+            // TX 
+            // struct AuctionOrder {
+            //     address tokenInputAddress;
+            //     address tokenOutputAddress;
+            //     uint256 tokenInputAmount;
+            //     uint256 minimumTokenOutputAmount;
+            //     uint256 sourceChain;
+            //     uint256 destinationChain;
+            // }
+        }
+    }
+
+    const intervalRef = useRef<number | undefined>();
+
+    const processInputValue = async () => {
         const messages = await prompt.format({
-            text: "I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain."
+            text: userIntent //"I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain."
         });
 
         const response = await llm.predict(messages);
 
-        console.log((JSON.parse(response)).to);
-    }
+        try {
+            const decoded = JSON.parse(response) as IntentDecoded;
+            console.log(decoded);
+
+            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount && decoded.tokenOutputAmount) {
+                setIntentDecoded(decoded);
+            }
+        } catch (error) {
+            console.log("Invalid response, so we don't change state");
+        }
+    };
 
     useEffect(() => {
-        test()
-            .then(() => {
+        if (userIntent !== '') {
+            const intervalFunction = () => {
+                processInputValue()
+            };
 
-            })
-            .catch((err) => {
-            })
-    }, [])
+            intervalRef.current = window.setInterval(intervalFunction, 5000);
+
+            return () => {
+                clearInterval(intervalRef.current);
+            };
+        } else {
+            clearInterval(intervalRef.current);
+        }
+    }, [userIntent]);
+
+    useEffect(() => {
+        if (intentDecoded) {
+            clearInterval(intervalRef.current);
+        }
+    }, [intentDecoded]);
 
     return (
         <Flex justifyContent="center" flex={1} alignContent="center" alignItems="center">
@@ -127,9 +201,9 @@ export default function IntentView() {
                                 width="100%"
                                 p="1.62rem"
                                 borderRadius="1.25rem"
-                                disabled={userIntent === ''} // TODO: Disable when is Swapping
+                                disabled={userIntent === '' || !intentDecoded} // TODO: Disable when is Swapping
                                 _hover={{ bg: 'rgb(251, 211, 225)' }}>
-                                Swap
+                                {intentDecoded ? "Swap" : "Processing..."}
                             </Button>)}
 
                         {isSwapping && (

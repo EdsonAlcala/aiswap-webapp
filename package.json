@@ -16,6 +16,7 @@
     "@types/react-dom": "18.2.7",
     "eslint": "8.45.0",
     "eslint-config-next": "13.4.12",
+    "ethers": "^6.6.4",
     "langchain": "^0.0.114",
     "next": "13.4.12",
     "react": "18.2.0",
