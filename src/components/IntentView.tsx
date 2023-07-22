@@ -2,9 +2,10 @@ import { Box, Button, Flex, Input, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
-import { ethers } from "ethers";
-import { useAccount, useConnect, useContractWrite } from "wagmi";
+import { ethers, getAddress } from "ethers";
+import { useAccount, useConnect, useContractRead, useContractWrite, usePublicClient } from "wagmi";
 import ABI from "../abis/AISwap.json";
+import ERC20ABI from '../abis/ERC20.json';
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -50,6 +51,8 @@ export default function IntentView() {
     const { connect, connectors } = useConnect()
     const [userIntent, setUserIntent] = useState('')
     const [intentDecoded, setIntentDecoded] = useState<IntentDecoded | undefined>(undefined);
+    const publicClient = usePublicClient()
+    const [requiresAllowance, setRequiresAllowance] = useState(false)
 
     const { data, isLoading, isSuccess, write } = useContractWrite({
         address: process.env.NEXT_PUBLIC_AISWAP_ADDRESS as any,
@@ -57,58 +60,17 @@ export default function IntentView() {
         functionName: 'createAuction',
     })
 
-    // Handle processing of input value
-    const intervalRef = useRef<number | undefined>();
-
-    const processInputValue = async () => {
-        const messages = await prompt.format({
-            text: userIntent //"I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain."
-        });
-
-        const response = await llm.predict(messages);
-
-        try {
-            const decoded = JSON.parse(response) as IntentDecoded;
-            console.log(decoded);
-
-            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount && decoded.tokenOutputAmount) {
-                setIntentDecoded(decoded);
-            }
-        } catch (error) {
-            console.log("Invalid response, so we don't change state");
-        }
-    };
-
-    useEffect(() => {
-        if (userIntent !== '') {
-            const intervalFunction = () => {
-                processInputValue()
-            };
-
-            intervalRef.current = window.setInterval(intervalFunction, 5000);
-
-            return () => {
-                clearInterval(intervalRef.current);
-            };
-        } else {
-            clearInterval(intervalRef.current);
-        }
-    }, [userIntent]);
-
-    useEffect(() => {
-        if (intentDecoded) {
-            clearInterval(intervalRef.current);
-        }
-    }, [intentDecoded]);
+    const { data: approvalData, isLoading: isApproving, isSuccess: isApprovalSuccessful, write: approve } = useContractWrite({
+        abi: ERC20ABI,
+        functionName: 'approve',
+    })
 
     const getTokenAddress = (tokenName: string) => {
         switch (tokenName.toLowerCase()) {
-            case "dai":
-                return "0x6b175474e89094c44da98b954eedeac495271d0f";
             case "usdc":
-                return "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+                return "0x131823ca7E06cacbDF4B04d14fF2fb4FB2EEF6B7";
             case "weth":
-                return "0xdac17f958d2ee523a2206206994597c13d831ec7";
+                return "0xBb50908414e123D835e9c0ef42d4BA957d621D45";
             default:
                 throw new Error("Invalid token name");
         }
@@ -150,13 +112,77 @@ export default function IntentView() {
         }
     }
 
+    // Handle processing of input value
+    const intervalRef = useRef<number | undefined>();
+
+    const processInputValue = async () => {
+        const messages = await prompt.format({
+            text: userIntent //"I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain."
+        });
+
+        const response = await llm.predict(messages);
+
+        try {
+            const decoded = JSON.parse(response) as IntentDecoded;
+            console.log(decoded);
+
+            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount && decoded.tokenOutputAmount) {
+                setIntentDecoded(decoded);
+
+                const currentAllowance: any = await publicClient.readContract({
+                    address: getTokenAddress(decoded.tokenInput),
+                    abi: ERC20ABI,
+                    functionName: 'allowance',
+                    args: [
+                        address,
+                        process.env.NEXT_PUBLIC_AISWAP_ADDRESS
+                    ]
+                })
+                console.log("Current allowance: ", currentAllowance)
+
+                const requiredAllowance = ethers.parseEther(decoded.tokenInputAmount.toString());
+
+                console.log("Required allowance: ", requiredAllowance)
+
+                if (currentAllowance < requiredAllowance) {
+                    console.log("It requires allowance")
+                    setRequiresAllowance(true);
+                }
+            }
+        } catch (error) {
+            console.log("Invalid response, so we don't change state");
+        }
+    };
+
+    useEffect(() => {
+        if (userIntent !== '') {
+            const intervalFunction = () => {
+                processInputValue()
+            };
+
+            intervalRef.current = window.setInterval(intervalFunction, 5000);
+
+            return () => {
+                clearInterval(intervalRef.current);
+            };
+        } else {
+            clearInterval(intervalRef.current);
+        }
+    }, [userIntent]);
+
+    useEffect(() => {
+        if (intentDecoded) {
+            clearInterval(intervalRef.current);
+        }
+    }, [intentDecoded]);
+
     async function swap() {
         if (intentDecoded) {
             write({
                 args: [
                     {
-                        tokenInputAddress: intentDecoded.tokenInput,
-                        tokenOutputAddress: intentDecoded.tokenOutput,
+                        tokenInputAddress: getTokenAddress(intentDecoded.tokenInput),
+                        tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput),
                         tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
                         minimumTokenOutputAmount: ethers.parseEther(intentDecoded.tokenOutputAmount.toString()),
                         sourceChain: getChainId(intentDecoded.from),
@@ -164,6 +190,20 @@ export default function IntentView() {
                     }
                 ],
             });
+        }
+    }
+
+    async function approveTokenAllowance() {
+        if (intentDecoded) {
+            const requiredAllowance = ethers.parseEther(intentDecoded.tokenInputAmount.toString());
+
+            approve({
+                address: getTokenAddress(intentDecoded.tokenInput),
+                args: [
+                    process.env.NEXT_PUBLIC_AISWAP_ADDRESS,
+                    requiredAllowance
+                ],
+            } as any);
         }
     }
 
@@ -196,6 +236,7 @@ export default function IntentView() {
                         <Input
                             placeholder="Swap 10 DAI for 10 USDC in Arbitrum"
                             fontWeight="400"
+                            disabled={!address}
                             fontSize="0.9rem"
                             width="100%"
                             height={{ base: '4em', md: '4em' }}
@@ -241,7 +282,7 @@ export default function IntentView() {
 
                         {userIntent !== '' && (
                             <Button
-                                onClick={() => swap()}
+                                onClick={() => requiresAllowance ? approveTokenAllowance() : swap()}
                                 color="rgb(213, 0, 102)"
                                 bg="rgb(253, 234, 241)"
                                 width="100%"
@@ -249,10 +290,10 @@ export default function IntentView() {
                                 borderRadius="1.25rem"
                                 disabled={userIntent === '' || !intentDecoded} // TODO: Disable when is Swapping
                                 _hover={{ bg: 'rgb(251, 211, 225)' }}>
-                                {intentDecoded ? "Swap" : "Processing..."}
+                                {intentDecoded ? (requiresAllowance ? "Approve" : "Swap") : "Processing..."}
                             </Button>)}
 
-                        {isLoading && (
+                        {isLoading || isApproving && (
                             <div style={{ padding: '1em' }}>
                                 <Spinner color="red.500" />
                             </div>
