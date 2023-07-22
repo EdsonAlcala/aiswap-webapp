@@ -1,5 +1,5 @@
 import { Box, Button, Flex, Input, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
 import { ethers } from "ethers";
@@ -103,20 +103,19 @@ export default function IntentView() {
         },
     })
 
-    const calculateOutputAmount = () => {
-        const outputAmount = intentDecoded?.tokenInputAmount;
+    const calculateOutputAmount = (decoded: IntentDecoded) => {
+        console.log("Calculating output amount", decoded)
+        const outputAmount = decoded.tokenInputAmount;
+        console.log("Output amount: ", outputAmount)
         setOutPutAmount(outputAmount);
     }
 
-    // useEffect(() => {
-    //     setTimeout(() => {
-    //         setIsQuoting(false);
-    //         calculateOutputAmount();
-    //     }, 3000);
-    // }, [isQuoting])
-
     async function quote() {
         setIsQuoting(true);
+        setIntentDecoded(undefined);
+        setOutPutAmount(undefined);
+        setAnAssetIsNotSupported(false);
+        setAssetNotSupported('');
 
         const messages = await prompt.format({
             text: userIntent // Example: I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain
@@ -130,6 +129,7 @@ export default function IntentView() {
 
             if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
                 setIntentDecoded(decoded);
+                console.log("Setting intent decoded", decoded);
             }
 
             try {
@@ -137,6 +137,7 @@ export default function IntentView() {
             } catch (error) {
                 setAssetNotSupported(decoded.tokenInput);
                 setAnAssetIsNotSupported(true);
+                setIsQuoting(false);
                 return;
             }
 
@@ -145,6 +146,7 @@ export default function IntentView() {
             } catch (error) {
                 setAssetNotSupported(decoded.tokenOutput);
                 setAnAssetIsNotSupported(true);
+                setIsQuoting(false);
                 return;
             }
 
@@ -172,7 +174,7 @@ export default function IntentView() {
 
             setTimeout(() => {
                 setIsQuoting(false);
-                calculateOutputAmount();
+                calculateOutputAmount(decoded);
             }, 3000);
 
         } catch (error) {
@@ -224,6 +226,12 @@ export default function IntentView() {
             quote();
         }
     }
+
+    useEffect(() => {
+        setIsQuoting(false);
+        setOutPutAmount(undefined);
+        setIntentDecoded(undefined);
+    }, [userIntent])
 
     return (
         <Flex justifyContent="center" flex={1} alignContent="center" alignItems="center">
@@ -314,7 +322,7 @@ export default function IntentView() {
                                 Write your intent
                             </Button>)}
 
-                        {userIntent !== '' && !anAssetIsNotSupported && intentDecoded && (
+                        {userIntent !== '' && !anAssetIsNotSupported && (
                             <Button
                                 onClick={() => requiresAllowance ? approveTokenAllowance() : swap()}
                                 color="rgb(213, 0, 102)"
@@ -345,7 +353,7 @@ export default function IntentView() {
                                         Quoting...
                                     </Flex>
                                 )}
-                                {(!isLoading && !isApproving && !isQuoting) ? requiresAllowance ? "Approve" : "Swap" : ""}
+                                {(!isLoading && !isApproving && !isQuoting) ? intentDecoded ? requiresAllowance ? "Approve" : "Swap" : "Processing..." : ""}
                             </Button>)}
 
                         {anAssetIsNotSupported && (
