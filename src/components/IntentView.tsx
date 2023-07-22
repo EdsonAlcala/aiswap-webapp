@@ -2,10 +2,13 @@ import { Box, Button, Flex, Input, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
-import { ethers, getAddress } from "ethers";
-import { useAccount, useConnect, useContractRead, useContractWrite, usePublicClient } from "wagmi";
+import { ethers } from "ethers";
+import { useAccount, useConnect, useContractWrite, useNetwork, usePublicClient } from "wagmi";
+import { toast } from 'react-toastify';
+
 import ABI from "../abis/AISwap.json";
 import ERC20ABI from '../abis/ERC20.json';
+import SuccessToast from "./SuccessToast";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -51,18 +54,53 @@ export default function IntentView() {
     const { connect, connectors } = useConnect()
     const [userIntent, setUserIntent] = useState('')
     const [intentDecoded, setIntentDecoded] = useState<IntentDecoded | undefined>(undefined);
+
     const publicClient = usePublicClient()
     const [requiresAllowance, setRequiresAllowance] = useState(false)
+
+    // To handle assets not supported
+    const [anAssetIsNotSupported, setAnAssetIsNotSupported] = useState(false)
+    const [assetNotSupported, setAssetNotSupported] = useState('')
+    const { chain } = useNetwork()
 
     const { data, isLoading, isSuccess, write } = useContractWrite({
         address: process.env.NEXT_PUBLIC_AISWAP_ADDRESS as any,
         abi: ABI,
         functionName: 'createAuction',
+        onSuccess(data) {
+            console.log("Swap successful", data)
+            setIntentDecoded(undefined);
+            setUserIntent('');
+            toast.success(
+                <SuccessToast
+                    chainId={chain?.id as any}
+                    hash={data.hash}
+                />,
+                {
+                    autoClose: 10000,
+                    toastId: data.hash,
+                }
+            );
+        }
     })
 
     const { data: approvalData, isLoading: isApproving, isSuccess: isApprovalSuccessful, write: approve } = useContractWrite({
         abi: ERC20ABI,
         functionName: 'approve',
+        onSuccess(data) {
+            console.log("Approve successful", data)
+            setRequiresAllowance(false);
+            toast.success(
+                <SuccessToast
+                    chainId={chain?.id as any}
+                    hash={data.hash}
+                />,
+                {
+                    autoClose: 10000,
+                    toastId: data.hash,
+                }
+            );
+        },
     })
 
     const getTokenAddress = (tokenName: string) => {
@@ -72,7 +110,7 @@ export default function IntentView() {
             case "weth":
                 return "0xBb50908414e123D835e9c0ef42d4BA957d621D45";
             default:
-                throw new Error("Invalid token name");
+                throw new Error("Token not supported")
         }
     }
 
@@ -117,7 +155,7 @@ export default function IntentView() {
 
     const processInputValue = async () => {
         const messages = await prompt.format({
-            text: userIntent //"I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain."
+            text: userIntent // Example: I want to swap 10 USDC from Ethereum to 10 DAI in Gnosis chain
         });
 
         const response = await llm.predict(messages);
@@ -129,6 +167,23 @@ export default function IntentView() {
             if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount && decoded.tokenOutputAmount) {
                 setIntentDecoded(decoded);
 
+                try {
+                    getTokenAddress(decoded.tokenInput)
+                } catch (error) {
+                    setAssetNotSupported(decoded.tokenInput);
+                    setAnAssetIsNotSupported(true);
+                    return;
+                }
+
+                try {
+                    getTokenAddress(decoded.tokenOutput);
+                } catch (error) {
+                    setAssetNotSupported(decoded.tokenOutput);
+                    setAnAssetIsNotSupported(true);
+                    return;
+                }
+
+                // we are sure only supported assets will reach this point
                 const currentAllowance: any = await publicClient.readContract({
                     address: getTokenAddress(decoded.tokenInput),
                     abi: ERC20ABI,
@@ -138,6 +193,7 @@ export default function IntentView() {
                         process.env.NEXT_PUBLIC_AISWAP_ADDRESS
                     ]
                 })
+
                 console.log("Current allowance: ", currentAllowance)
 
                 const requiredAllowance = ethers.parseEther(decoded.tokenInputAmount.toString());
@@ -156,6 +212,9 @@ export default function IntentView() {
 
     useEffect(() => {
         if (userIntent !== '') {
+
+            setIntentDecoded(undefined);
+
             const intervalFunction = () => {
                 processInputValue()
             };
@@ -207,6 +266,13 @@ export default function IntentView() {
         }
     }
 
+    const retry = () => {
+        setAnAssetIsNotSupported(false);
+        setAssetNotSupported('');
+        setUserIntent('');
+        setIntentDecoded(undefined);
+    }
+
     return (
         <Flex justifyContent="center" flex={1} alignContent="center" alignItems="center">
             <Box
@@ -216,6 +282,16 @@ export default function IntentView() {
                 marginTop={{ base: '10rem', md: '10rem' }}
                 boxShadow="0px 0px 20px rgba(0, 0, 0, 0.05)"
             >
+                <Button onClick={() => toast.success(
+                    <SuccessToast
+                        chainId={chain?.id as any}
+                        hash={"0x1234567890"}
+                    />,
+                    {
+                        autoClose: 10000,
+                        toastId: "0x1234567890"
+                    }
+                )}>Show Toast</Button>
                 <Flex
                     alignItems="left"
                     flexDirection="column"
@@ -234,7 +310,7 @@ export default function IntentView() {
 
                     <Box>
                         <Input
-                            placeholder="Swap 10 DAI for 10 USDC in Arbitrum"
+                            placeholder="i.e Swap 10 DAI for 10 USDC in Arbitrum"
                             fontWeight="400"
                             disabled={!address}
                             fontSize="0.9rem"
@@ -280,7 +356,7 @@ export default function IntentView() {
                                 Write your intent
                             </Button>)}
 
-                        {userIntent !== '' && (
+                        {userIntent !== '' && !anAssetIsNotSupported && (
                             <Button
                                 onClick={() => requiresAllowance ? approveTokenAllowance() : swap()}
                                 color="rgb(213, 0, 102)"
@@ -288,16 +364,38 @@ export default function IntentView() {
                                 width="100%"
                                 p="1.62rem"
                                 borderRadius="1.25rem"
-                                disabled={userIntent === '' || !intentDecoded} // TODO: Disable when is Swapping
+                                disabled={isLoading || isApproving}
                                 _hover={{ bg: 'rgb(251, 211, 225)' }}>
-                                {intentDecoded ? (requiresAllowance ? "Approve" : "Swap") : "Processing..."}
+                                {isLoading && (
+                                    <Flex flexDirection={"row"} alignItems={"center"}>
+                                        Swapping...
+                                        <div style={{ padding: '1em' }}>
+                                            <Spinner color="red.500" />
+                                        </div>
+                                    </Flex>
+                                )}
+                                {isApproving && (
+                                    <Flex flexDirection={"row"} alignItems={"center"}>
+                                        Approving...
+                                        <div style={{ padding: '1em' }}>
+                                            <Spinner color="red.500" />
+                                        </div>
+                                    </Flex>
+                                )}
+                                {(!isLoading && !isApproving) ? intentDecoded ? (requiresAllowance ? "Approve" : "Swap") : "Processing..." : ""}
                             </Button>)}
 
-                        {isLoading || isApproving && (
-                            <div style={{ padding: '1em' }}>
-                                <Spinner color="red.500" />
-                            </div>
-                        )}
+                        {anAssetIsNotSupported && (
+                            <Button
+                                onClick={() => retry()}
+                                color="rgb(213, 0, 102)"
+                                bg="rgb(253, 234, 241)"
+                                width="100%"
+                                p="1.62rem"
+                                borderRadius="1.25rem"
+                                _hover={{ bg: 'rgb(251, 211, 225)' }}>
+                                {`${assetNotSupported} not supported, Retry`}
+                            </Button>)}
                     </Box>
                 </Flex>
             </Box>

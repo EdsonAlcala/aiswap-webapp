@@ -1,6 +1,7 @@
 import { Box, ChakraProvider, Flex } from '@chakra-ui/react'
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { ToastContainer } from 'react-toastify';
 
 import IntentView from '@/components/IntentView'
 import Header from '@/components/Header'
@@ -25,6 +26,7 @@ export default function App() {
                             </Box>
                         </Flex>
                         <IntentView />
+                        <ToastContainer theme='colored' />
                     </ChakraProvider>
                 </RainbowKitProvider>
             </WagmiConfig>
