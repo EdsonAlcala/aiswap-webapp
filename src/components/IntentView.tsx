@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
 import { ethers } from "ethers";
-import { useAccount, useContractWrite } from "wagmi";
+import { useAccount, useConnect, useContractWrite } from "wagmi";
 import ABI from "../abis/AISwap.json";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
@@ -47,6 +47,7 @@ interface IntentDecoded {
 
 export default function IntentView() {
     const { address } = useAccount()
+    const { connect, connectors } = useConnect()
     const [userIntent, setUserIntent] = useState('')
     const [intentDecoded, setIntentDecoded] = useState<IntentDecoded | undefined>(undefined);
 
@@ -100,14 +101,53 @@ export default function IntentView() {
         }
     }, [intentDecoded]);
 
+    const getTokenAddress = (tokenName: string) => {
+        switch (tokenName.toLowerCase()) {
+            case "dai":
+                return "0x6b175474e89094c44da98b954eedeac495271d0f";
+            case "usdc":
+                return "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+            case "weth":
+                return "0xdac17f958d2ee523a2206206994597c13d831ec7";
+            default:
+                throw new Error("Invalid token name");
+        }
+    }
+
     const getChainId = (chainName: string) => {
-        if (chainName.toLowerCase() === "ethereum") return 1
-        if (chainName.toLowerCase() === "gnosis" || chainName.toLowerCase() === "gnosis chain") return 2
-        if (chainName.toLowerCase() === "arbitrum") return 42161
-        if (chainName.toLowerCase() === "optimism") return 10
-        if (chainName.toLowerCase() === "xdai") return 100
-        // goerli
-        // arbitrum goerli
+        // MAINNETS
+        if (chainName.toLowerCase() === "ethereum") {
+            return 1
+        }
+
+        if (chainName.toLowerCase() === "gnosis" || chainName.toLowerCase() === "gnosis chain") {
+            return 100
+        }
+
+        if (chainName.toLowerCase() === "arbitrum" || chainName.toLowerCase() === "arbitrum one") {
+            return 42161
+        }
+
+        if (chainName.toLowerCase() === "op" || chainName.toLowerCase() === "optimism") {
+            return 10
+        }
+
+        // TESTNETS
+        if (chainName.toLowerCase() === "gnosis chiado testnet" || chainName.toLowerCase() === "gnosis testnet") {
+            return 10200
+        }
+
+        if (chainName.toLowerCase() === "goerli") {
+            return 5
+        }
+
+        if (chainName.toLowerCase() === "arbitrum goerli" || chainName.toLowerCase() === "arbitrum testnet") {
+            return 421613
+        }
+
+        if (chainName.toLowerCase() === "linea testnet") {
+            return 59140
+        }
     }
 
     async function swap() {
@@ -171,15 +211,31 @@ export default function IntentView() {
                         />
                     </Box>
                     <Box>
-                        {userIntent === '' && (
+                        {!address && (
                             <Button
                                 color="rgb(213, 0, 102)"
                                 bg="rgb(253, 234, 241)"
                                 width="100%"
                                 p="1.62rem"
                                 borderRadius="1.25rem"
-                                disabled={userIntent === ''}
+                                onClick={() => connect({
+                                    connector: connectors[0]
+                                })}
                                 _hover={{ bg: 'rgb(251, 211, 225)' }}>
+                                Connect Wallet
+                            </Button>)}
+
+                        {userIntent === '' && address && (
+                            <Button
+                                id="write-intent-button"
+                                color="rgb(213, 0, 102)"
+                                bg="rgb(253, 234, 241)"
+                                width="100%"
+                                p="1.62rem"
+                                borderRadius="1.25rem"
+                                opacity={0.8}
+                                disabled={true}
+                                _hover={{ bg: 'rgb(253, 234, 241)' }}>
                                 Write your intent
                             </Button>)}
 
