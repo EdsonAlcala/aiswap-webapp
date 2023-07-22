@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
 import { ethers } from "ethers";
+import { useAccount, useContractWrite } from "wagmi";
+import ABI from "../abis/AISwap.json";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -44,56 +46,17 @@ interface IntentDecoded {
 }
 
 export default function IntentView() {
+    const { address } = useAccount()
     const [userIntent, setUserIntent] = useState('')
-    const [isSwapping, setIsSwapping] = useState(false)
     const [intentDecoded, setIntentDecoded] = useState<IntentDecoded | undefined>(undefined);
 
-    async function swap() {
-        setIsSwapping(true)
-        // TODO
-    }
+    const { data, isLoading, isSuccess, write } = useContractWrite({
+        address: process.env.NEXT_PUBLIC_AISWAP_ADDRESS as any,
+        abi: ABI,
+        functionName: 'createAuction',
+    })
 
-    const getChainId = (chainName: string) => {
-        return 1
-    }
-
-    const buildTransaction = async () => {
-        if (intentDecoded) {
-            // from
-            // to
-            // tokenInput
-            // tokenOutput
-            // tokenInputAmount
-            // tokenOutputAmount
-            const txPayload = {
-
-            }
-            // create contract instance and simply use the intent information
-            // get provider from wagmi
-
-            // const contract = new ethers.Contract("0x5FbDB2315678afecb367f032d93F642f64180aa3", [], ethers.getDefaultProvider());
-
-            // const tx = await contract.createOrder({
-            //     tokenInputAddress: intentDecoded.tokenInput,
-            //     tokenOutputAddress: intentDecoded.tokenOutput,
-            //     tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
-            //     minimumTokenOutputAmount: ethers.parseEther(intentDecoded.tokenOutputAmount.toString()),
-            //     sourceChain: getChainId(intentDecoded.from),
-            //     destinationChain: getChainId(intentDecoded.to)
-            // });
-
-            // TX 
-            // struct AuctionOrder {
-            //     address tokenInputAddress;
-            //     address tokenOutputAddress;
-            //     uint256 tokenInputAmount;
-            //     uint256 minimumTokenOutputAmount;
-            //     uint256 sourceChain;
-            //     uint256 destinationChain;
-            // }
-        }
-    }
-
+    // Handle processing of input value
     const intervalRef = useRef<number | undefined>();
 
     const processInputValue = async () => {
@@ -136,6 +99,33 @@ export default function IntentView() {
             clearInterval(intervalRef.current);
         }
     }, [intentDecoded]);
+
+    const getChainId = (chainName: string) => {
+        if (chainName.toLowerCase() === "ethereum") return 1
+        if (chainName.toLowerCase() === "gnosis" || chainName.toLowerCase() === "gnosis chain") return 2
+        if (chainName.toLowerCase() === "arbitrum") return 42161
+        if (chainName.toLowerCase() === "optimism") return 10
+        if (chainName.toLowerCase() === "xdai") return 100
+        // goerli
+        // arbitrum goerli
+    }
+
+    async function swap() {
+        if (intentDecoded) {
+            write({
+                args: [
+                    {
+                        tokenInputAddress: intentDecoded.tokenInput,
+                        tokenOutputAddress: intentDecoded.tokenOutput,
+                        tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
+                        minimumTokenOutputAmount: ethers.parseEther(intentDecoded.tokenOutputAmount.toString()),
+                        sourceChain: getChainId(intentDecoded.from),
+                        destinationChain: getChainId(intentDecoded.to)
+                    }
+                ],
+            });
+        }
+    }
 
     return (
         <Flex justifyContent="center" flex={1} alignContent="center" alignItems="center">
@@ -195,7 +185,7 @@ export default function IntentView() {
 
                         {userIntent !== '' && (
                             <Button
-                                onClick={swap}
+                                onClick={() => swap()}
                                 color="rgb(213, 0, 102)"
                                 bg="rgb(253, 234, 241)"
                                 width="100%"
@@ -206,7 +196,7 @@ export default function IntentView() {
                                 {intentDecoded ? "Swap" : "Processing..."}
                             </Button>)}
 
-                        {isSwapping && (
+                        {isLoading && (
                             <div style={{ padding: '1em' }}>
                                 <Spinner color="red.500" />
                             </div>
