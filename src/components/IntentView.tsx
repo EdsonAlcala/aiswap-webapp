@@ -1,15 +1,16 @@
 import { Box, Button, Flex, Input, Spinner, Text } from "@chakra-ui/react";
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { OpenAI } from "langchain/llms/openai";
 import { PromptTemplate } from "langchain/prompts";
 import { ethers } from "ethers";
 import { useAccount, useConnect, useContractWrite, useNetwork, usePublicClient } from "wagmi";
 import { toast } from 'react-toastify';
 
-import ABI from "../abis/AISwap.json";
-import ERC20ABI from '../abis/ERC20.json';
 import SuccessToast from "./SuccessToast";
 import { getChainId, getTokenAddress } from "@/utils";
+
+import ABI from "../abis/AISwap.json";
+import ERC20ABI from '../abis/ERC20.json';
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
