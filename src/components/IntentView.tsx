@@ -11,6 +11,7 @@ import { getChainId, getTokenAddress } from "@/utils";
 
 import ABI from "../abis/AISwap.json";
 import ERC20ABI from '../abis/ERC20.json';
+import { get } from "lodash";
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
@@ -80,9 +81,9 @@ export default function IntentView() {
     }
 
     const { data, isLoading, isSuccess, write } = useContractWrite({
-        address: getAISwapAddress(getChainId(chain?.network as any) as any) as any,
         abi: ABI,
         functionName: 'createAuction',
+
         onSuccess(data) {
             console.log("Swap successful", data)
             setIntentDecoded(undefined);
@@ -145,7 +146,7 @@ export default function IntentView() {
             const decodedWithFromComingFromNetwork = { ...decoded, from: chain?.network as string } as IntentDecoded;
             console.log("decodedWithFromComingFromNetwork", decodedWithFromComingFromNetwork);
 
-            console.log(getChainId(chain?.network as any))
+            console.log('chain', chain)
 
             if (decoded.to && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
                 setIntentDecoded(decodedWithFromComingFromNetwork);
@@ -153,7 +154,8 @@ export default function IntentView() {
             }
 
             try {
-                getTokenAddress(decoded.tokenInput, getChainId(decoded.from) as any)
+                console.log("Getting token address", decoded.tokenInput, chain?.id)
+                getTokenAddress(decoded.tokenInput, chain?.id as any)
             } catch (error) {
                 setAssetNotSupported(decoded.tokenInput);
                 setAnAssetIsNotSupported(true);
@@ -162,6 +164,7 @@ export default function IntentView() {
             }
 
             try {
+                console.log("Getting token address", decoded.tokenInput, chain?.id)
                 getTokenAddress(decoded.tokenOutput, getChainId(decoded.to) as any);
             } catch (error) {
                 setAssetNotSupported(decoded.tokenOutput);
@@ -170,14 +173,16 @@ export default function IntentView() {
                 return;
             }
 
+            console.log("About to get allowance")
             // we are sure only supported assets will reach this point
+            console.log("getTokenAddress(decoded.tokenInput, chain?.id as number) as any", getTokenAddress(decoded.tokenInput, chain?.id as number) as any)
             const currentAllowance: any = await publicClient.readContract({
-                address: getTokenAddress(decoded.tokenInput, getChainId(decodedWithFromComingFromNetwork.from) as number) as any,
+                address: getTokenAddress(decoded.tokenInput, chain?.id as number) as any,
                 abi: ERC20ABI,
                 functionName: 'allowance',
                 args: [
                     address,
-                    process.env.NEXT_PUBLIC_AISWAP_ADDRESS
+                    getAISwapAddress(chain?.id) as any
                 ]
             })
 
@@ -204,18 +209,28 @@ export default function IntentView() {
 
     async function swap() {
         if (intentDecoded && outPutAmount) {
+            console.log("Aqui", getAISwapAddress(chain?.id as any))
+            console.log("chain id", chain?.id)
+
+            console.log("intentDecoded.tokenInput", getTokenAddress(intentDecoded.tokenInput, chain?.id as any))
+            console.log("intentDecoded.tokenOutput", getTokenAddress(intentDecoded.tokenOutput, chain?.id as any))
+            console.log("intentDecoded.tokenInputAmount", ethers.parseEther(intentDecoded.tokenInputAmount.toString()))
+            console.log("outPutAmount", ethers.parseEther(outPutAmount.toString()))
+            console.log("chain?.id as any", chain?.id as any)
+            console.log("getChainId(intentDecoded.to)", getChainId(intentDecoded.to))
             write({
+                address: getAISwapAddress(chain?.id as any),
                 args: [
                     {
                         tokenInputAddress: getTokenAddress(intentDecoded.tokenInput, chain?.id as any),
-                        tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput, chain?.id as any),
+                        tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput, getChainId(intentDecoded.to) as any),
                         tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
                         minimumTokenOutputAmount: ethers.parseEther(outPutAmount.toString()),
-                        sourceChain: getChainId(intentDecoded.from),
+                        sourceChain: chain?.id as any,
                         destinationChain: getChainId(intentDecoded.to)
                     }
                 ],
-            });
+            } as any);
         }
     }
 
@@ -226,7 +241,7 @@ export default function IntentView() {
             approve({
                 address: getTokenAddress(intentDecoded.tokenInput, chain?.id as any),
                 args: [
-                    process.env.NEXT_PUBLIC_AISWAP_ADDRESS,
+                    getAISwapAddress(chain?.id as any),
                     requiredAllowance
                 ],
             } as any);

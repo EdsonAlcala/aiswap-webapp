@@ -5,6 +5,9 @@ const ARBITRUM_GOERLI_CHAIN_ID = 421613
 const GOERLI_CHAIN_ID = 5
 
 export const getTokenAddress = (tokenName: string, chainId: number) => {
+    console.log("chainId", chainId)
+    console.log("tokenName", tokenName)
+
     if (chainId === GNOSIS_CHAIN_ID) {
         switch (tokenName.toLowerCase()) {
             case "usdc":
@@ -42,9 +45,9 @@ export const getTokenAddress = (tokenName: string, chainId: number) => {
     if (chainId === GOERLI_CHAIN_ID) {
         switch (tokenName.toLowerCase()) {
             case "usdc":
-                return "0x1bD9A58de0b81A262Db1fA1aab596D29555C41a7";
+                return "0x7D11fe62Cc80c520fF5a29277Ff7a2b8414de4C5";
             case "weth":
-                return "0x143d46ceE863eD9a4087Aa789f836D21A34C9207";
+                return "0x9bEf665Ef4123b07418ABcD869B74e94C4136c7c";
             default:
                 throw new Error("Token not supported")
         }
@@ -53,9 +56,9 @@ export const getTokenAddress = (tokenName: string, chainId: number) => {
     if (chainId === ARBITRUM_GOERLI_CHAIN_ID) {
         switch (tokenName.toLowerCase()) {
             case "usdc":
-                return "0xFaa0a22Aee2F0039501D8b4e9752b57188A99245";
+                return "0x1F21E2AEEf07BF2A9a7Af7BDed43dCE3E5bEc976";
             case "weth":
-                return "0xa08Eb422A1D7087634eDcB886dBE97e8f5E3eC06";
+                return "0x67c4B1E1D747069d6FB5f1db08EFCA7563427637";
             default:
                 throw new Error("Token not supported")
         }
@@ -79,5 +82,9 @@ export const getChainId = (chainName: string) => {
     // TESTNETS
     if (chainName.toLowerCase() === "arbitrum goerli" || chainName.toLowerCase() === "arbitrum testnet") {
         return ARBITRUM_GOERLI_CHAIN_ID
+    }
+
+    if (chainName.toLowerCase() === "goerli" || chainName.toLowerCase() === "goerli testnet") {
+        return GOERLI_CHAIN_ID
     }
 }
