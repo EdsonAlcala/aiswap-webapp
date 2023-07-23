@@ -209,15 +209,6 @@ export default function IntentView() {
 
     async function swap() {
         if (intentDecoded && outPutAmount) {
-            console.log("getAISwapAddress", getAISwapAddress(chain?.id as any))
-            console.log("chain id", chain?.id)
-
-            console.log("intentDecoded.tokenInput", getTokenAddress(intentDecoded.tokenInput, chain?.id as any))
-            console.log("intentDecoded.tokenOutput", getTokenAddress(intentDecoded.tokenOutput, chain?.id as any))
-            console.log("intentDecoded.tokenInputAmount", ethers.parseUnits(intentDecoded.tokenInputAmount.toString(), 6))
-            console.log("outPutAmount", ethers.parseEther(outPutAmount.toString()))
-            console.log("chain?.id as any", chain?.id as any)
-            console.log("getChainId(intentDecoded.to)", getChainId(intentDecoded.to))
 
             const tokenInputDecimals = getTokenDecimals(intentDecoded.tokenInput, chain?.id as any);
             const tokenOutputDecimals = getTokenDecimals(intentDecoded.tokenOutput, getChainId(intentDecoded.to) as any);
