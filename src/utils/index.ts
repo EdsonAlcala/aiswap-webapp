@@ -51,10 +51,6 @@ export const getTokenAddress = (tokenName: string, chainId: number) => {
 
 export const getChainId = (chainName: string) => {
     // MAINNETS
-    // if (chainName.toLowerCase() === "ethereum") {
-    //     return 1
-    // }
-
     if (chainName.toLowerCase() === "gnosis" || chainName.toLowerCase() === "gnosis chain") {
         return GNOSIS_CHAIN_ID
     }
@@ -63,28 +59,12 @@ export const getChainId = (chainName: string) => {
         return ARBITRUM_CHAIN_ID
     }
 
-    // if (chainName.toLowerCase() === "op" || chainName.toLowerCase() === "optimism") {
-    //     return 10
-    // }
-
     if (chainName.toLowerCase() === "linea") {
         return LINEA_CHAIN_ID
     }
 
     // TESTNETS
-    // if (chainName.toLowerCase() === "gnosis chiado testnet" || chainName.toLowerCase() === "gnosis testnet") {
-    //     return 10200
-    // }
-
-    // if (chainName.toLowerCase() === "goerli") {
-    //     return 5
-    // }
-
     if (chainName.toLowerCase() === "arbitrum goerli" || chainName.toLowerCase() === "arbitrum testnet") {
         return ARBITRUM_GOERLI_CHAIN_ID
     }
-
-    // if (chainName.toLowerCase() === "linea testnet") {
-    //     return 59140
-    // }
 }
