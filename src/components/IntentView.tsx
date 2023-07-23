@@ -14,8 +14,6 @@ import ERC20ABI from '../abis/ERC20.json';
 
 const prompt = PromptTemplate.fromTemplate(`For the following text, extract the following information:
 
-from: The origin Blockchain on which the user wants to swap from \
-
 to: The destination Blockchain on which the user wants to receive the tokens swapped \
 
 tokenInput: The token the user wants to swap \
@@ -25,7 +23,6 @@ tokenOutput: The token the user wants to receive \
 tokenInputAmount: The amount of token the user wants to swap \
 
 Format the output as JSON with the following keys:
-from
 to
 tokenInput
 tokenOutput
@@ -126,17 +123,18 @@ export default function IntentView() {
 
         try {
             const decoded = JSON.parse(response) as IntentDecoded;
-            console.log(decoded);
+            const decodedWithFromComingFromNetwork = { ...decoded, from: chain?.network as string } as IntentDecoded;
+            console.log("decodedWithFromComingFromNetwork", decodedWithFromComingFromNetwork);
 
             console.log(getChainId(chain?.network as any))
 
-            if (decoded.to && decoded.from && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
-                setIntentDecoded(decoded);
+            if (decoded.to && decoded.tokenInput && decoded.tokenOutput && decoded.tokenInputAmount) {
+                setIntentDecoded(decodedWithFromComingFromNetwork);
                 console.log("Setting intent decoded", decoded);
             }
 
             try {
-                getTokenAddress(decoded.tokenInput)
+                getTokenAddress(decoded.tokenInput, getChainId(decoded.from) as any)
             } catch (error) {
                 setAssetNotSupported(decoded.tokenInput);
                 setAnAssetIsNotSupported(true);
@@ -145,7 +143,7 @@ export default function IntentView() {
             }
 
             try {
-                getTokenAddress(decoded.tokenOutput);
+                getTokenAddress(decoded.tokenOutput, getChainId(decoded.to) as any);
             } catch (error) {
                 setAssetNotSupported(decoded.tokenOutput);
                 setAnAssetIsNotSupported(true);
@@ -155,7 +153,7 @@ export default function IntentView() {
 
             // we are sure only supported assets will reach this point
             const currentAllowance: any = await publicClient.readContract({
-                address: getTokenAddress(decoded.tokenInput),
+                address: getTokenAddress(decoded.tokenInput, getChainId(decodedWithFromComingFromNetwork.from) as number) as any,
                 abi: ERC20ABI,
                 functionName: 'allowance',
                 args: [
@@ -190,11 +188,11 @@ export default function IntentView() {
             write({
                 args: [
                     {
-                        tokenInputAddress: getTokenAddress(intentDecoded.tokenInput),
-                        tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput),
+                        tokenInputAddress: getTokenAddress(intentDecoded.tokenInput, chain?.id as any),
+                        tokenOutputAddress: getTokenAddress(intentDecoded.tokenOutput, chain?.id as any),
                         tokenInputAmount: ethers.parseEther(intentDecoded.tokenInputAmount.toString()),
                         minimumTokenOutputAmount: ethers.parseEther(outPutAmount.toString()),
-                        sourceChain: chain?.id,
+                        sourceChain: getChainId(intentDecoded.from),
                         destinationChain: getChainId(intentDecoded.to)
                     }
                 ],
@@ -207,7 +205,7 @@ export default function IntentView() {
             const requiredAllowance = ethers.parseEther(intentDecoded.tokenInputAmount.toString());
 
             approve({
-                address: getTokenAddress(intentDecoded.tokenInput),
+                address: getTokenAddress(intentDecoded.tokenInput, chain?.id as any),
                 args: [
                     process.env.NEXT_PUBLIC_AISWAP_ADDRESS,
                     requiredAllowance
