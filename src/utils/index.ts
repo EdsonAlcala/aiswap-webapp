@@ -4,6 +4,64 @@ const LINEA_CHAIN_ID = 59144
 const ARBITRUM_GOERLI_CHAIN_ID = 421613
 const GOERLI_CHAIN_ID = 5
 
+export const getTokenDecimals = (tokenName: string, chainId: number) => {
+    if (chainId === GNOSIS_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "usdc":
+                return 6;
+            case "usdt":
+                return 6;
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+
+    if (chainId === ARBITRUM_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "usdc":
+                return 6;
+            case "dai":
+                return 18;
+            case "lusd":
+                return 18;
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+
+    if (chainId === LINEA_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "busd":
+                return 18;
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+
+    // TESTNETS
+    if (chainId === GOERLI_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "usdc":
+                return 18;
+            case "weth":
+                return 18;
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+
+    if (chainId === ARBITRUM_GOERLI_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "usdc":
+                return 18;
+            case "weth":
+                return 18;
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+}
+
 export const getTokenAddress = (tokenName: string, chainId: number) => {
     console.log("chainId", chainId)
     console.log("tokenName", tokenName)
