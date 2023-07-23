@@ -60,8 +60,27 @@ export default function IntentView() {
     const [assetNotSupported, setAssetNotSupported] = useState('')
     const { chain } = useNetwork()
 
+    const getAISwapAddress = (chainId: number | undefined) => {
+        if (chainId) {
+            switch (chainId) {
+                case 5:
+                    return process.env.NEXT_PUBLIC_AISWAP_ADDRESS_GOERLI
+                case 421613:
+                    return process.env.NEXT_PUBLIC_AISWAP_ADDRESS_ARBITRUM_GOERLI
+                case 42161:
+                    return process.env.NEXT_PUBLIC_AISWAP_ADDRESS_ARBITRUM
+                case 100:
+                    return process.env.NEXT_PUBLIC_AISWAP_ADDRESS_GNOSIS
+                case 59144:
+                    return process.env.NEXT_PUBLIC_AISWAP_ADDRESS_LINEA
+                default:
+                    throw new Error("Chain not supported")
+            }
+        }
+    }
+
     const { data, isLoading, isSuccess, write } = useContractWrite({
-        address: process.env.NEXT_PUBLIC_AISWAP_ADDRESS as any,
+        address: getAISwapAddress(getChainId(chain?.network as any) as any) as any,
         abi: ABI,
         functionName: 'createAuction',
         onSuccess(data) {

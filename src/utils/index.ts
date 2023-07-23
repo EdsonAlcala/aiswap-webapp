@@ -2,6 +2,7 @@ const GNOSIS_CHAIN_ID = 100
 const ARBITRUM_CHAIN_ID = 42161
 const LINEA_CHAIN_ID = 59144
 const ARBITRUM_GOERLI_CHAIN_ID = 421613
+const GOERLI_CHAIN_ID = 5
 
 export const getTokenAddress = (tokenName: string, chainId: number) => {
     if (chainId === GNOSIS_CHAIN_ID) {
@@ -37,12 +38,24 @@ export const getTokenAddress = (tokenName: string, chainId: number) => {
         }
     }
 
+    // TESTNETS
+    if (chainId === GOERLI_CHAIN_ID) {
+        switch (tokenName.toLowerCase()) {
+            case "usdc":
+                return "0x1bD9A58de0b81A262Db1fA1aab596D29555C41a7";
+            case "weth":
+                return "0x143d46ceE863eD9a4087Aa789f836D21A34C9207";
+            default:
+                throw new Error("Token not supported")
+        }
+    }
+
     if (chainId === ARBITRUM_GOERLI_CHAIN_ID) {
         switch (tokenName.toLowerCase()) {
             case "usdc":
-                return "0x131823ca7E06cacbDF4B04d14fF2fb4FB2EEF6B7";
+                return "0xFaa0a22Aee2F0039501D8b4e9752b57188A99245";
             case "weth":
-                return "0xBb50908414e123D835e9c0ef42d4BA957d621D45";
+                return "0xa08Eb422A1D7087634eDcB886dBE97e8f5E3eC06";
             default:
                 throw new Error("Token not supported")
         }
